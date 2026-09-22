@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>LinkedIn URL Checker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper: #f1f3ee;
+  --panel: #fbfcfa;
+  --ink: #1b2521;
+  --muted: #59665f;
+  --line: #d2d9d1;
+  --accent: #0e5f52;
+  --accent-hover: #0a4a40;
+  --live: #146c3a;   --live-bg: #e2f2e7;
+  --dead: #a3271f;   --dead-bg: #fae5e2;
+  --err: #86560a;    --err-bg: #faefd6;
+  --pending: #dfe4dd;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 15px/1.5 var(--sans);
+}
+:focus-visible { outline: 3px solid #1a7f6e; outline-offset: 2px; }
+
+.top {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 14px 24px; background: var(--ink); color: #f4f7f3;
+}
+.top h1 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: 0.1px; }
+.cookie-state { display: flex; align-items: center; gap: 10px; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: #e08b82; flex: none; }
+.dot.on { background: #7fd39d; }
+.cookie-state span { font-size: 14px; }
+
+.layout {
+  display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 20px;
+  padding: 20px 24px 32px; max-width: 1400px; margin: 0 auto;
+}
+@media (max-width: 900px) { .layout { grid-template-columns: 1fr; padding: 14px; } .top { padding: 12px 14px; } }
+
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 16px; }
+.inputs { align-self: start; display: flex; flex-direction: column; gap: 14px; }
+label, .label { font-weight: 500; font-size: 14px; display: block; margin-bottom: 6px; }
+textarea, input[type="text"], input[type="password"], input[type="search"], input[type="number"], select {
+  width: 100%; font: inherit; color: inherit; background: #fff;
+  border: 1px solid #b9c3ba; border-radius: 4px; padding: 8px 10px;
+}
+textarea { font-family: var(--mono); font-size: 13px; resize: vertical; min-height: 190px; line-height: 1.45; }
+.meta-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
+.muted { color: var(--muted); font-size: 13px; }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+button {
+  font: 500 14px var(--sans); cursor: pointer; border-radius: 4px;
+  padding: 8px 14px; border: 1px solid transparent; background: var(--accent); color: #fff;
+}
+button:hover:not(:disabled) { background: var(--accent-hover); }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+button.secondary { background: transparent; color: var(--ink); border-color: #9aa79d; }
+button.secondary:hover:not(:disabled) { background: #e6ebe4; }
+button.stop { background: var(--dead); }
+button.stop:hover:not(:disabled) { background: #85201a; }
+button.on-dark { background: transparent; color: #f4f7f3; border-color: #7d8b83; }
+button.on-dark:hover:not(:disabled) { background: #2a3630; }
+
+/* results */
+.results { min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+.ledger .counts { display: flex; flex-wrap: wrap; gap: 8px 26px; margin-bottom: 12px; align-items: baseline; }
+.count b { font-size: 26px; font-weight: 600; margin-right: 6px; font-variant-numeric: tabular-nums; }
+.count span { font-size: 14px; color: var(--muted); }
+.count.live b { color: var(--live); } .count.dead b { color: var(--dead); } .count.err b { color: var(--err); }
+.bar { display: flex; height: 12px; border-radius: 3px; overflow: hidden; background: var(--pending); }
+.bar i { display: block; height: 100%; transition: width 0.15s linear; }
+.bar .s-live { background: var(--live); } .bar .s-dead { background: var(--dead); } .bar .s-err { background: #c48a1a; }
+.progress-text { margin-top: 8px; min-height: 20px; }
+
+.tools { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.tools .grow { flex: 1 1 200px; min-width: 160px; }
+.tools select { width: auto; }
+
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); max-height: 62vh; overflow-y: auto; }
+table { border-collapse: collapse; width: 100%; min-width: 760px; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { position: sticky; top: 0; background: #e7ece5; font-weight: 600; font-size: 13px; cursor: pointer; user-select: none; white-space: nowrap; }
+th[aria-sort="ascending"]::after { content: " ▲"; font-size: 10px; }
+th[aria-sort="descending"]::after { content: " ▼"; font-size: 10px; }
+td.url { font-family: var(--mono); font-size: 12.5px; word-break: break-all; }
+td.note { color: var(--muted); font-size: 13px; }
+td.time { font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--muted); font-size: 13px; }
+tr.row-live { background: var(--live-bg); } tr.row-dead { background: var(--dead-bg); } tr.row-err { background: var(--err-bg); }
+.badge { font: 600 12px var(--sans); border-radius: 3px; padding: 3px 9px; border: 1px solid currentColor; background: #fff; cursor: pointer; }
+.badge:hover:not(:disabled) { background: #fff; filter: brightness(0.95); }
+.badge.live { color: var(--live); } .badge.dead { color: var(--dead); } .badge.err { color: var(--err); }
+.empty { padding: 34px 16px; text-align: center; color: var(--muted); }
+
+/* dialogs */
+dialog { border: 1px solid var(--line); border-radius: 8px; padding: 0; width: min(640px, calc(100vw - 28px)); background: var(--panel); color: var(--ink); }
+dialog::backdrop { background: rgba(20, 28, 24, 0.55); }
+dialog form, dialog .box { padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+dialog h2 { margin: 0; font-size: 17px; }
+dialog textarea { min-height: 150px; }
+dialog textarea.tall { min-height: 300px; }
+.dlg-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.msg { min-height: 20px; font-size: 14px; }
+.msg.ok { color: var(--live); } .msg.bad { color: var(--dead); }
+.hint { font-size: 13px; color: var(--muted); margin: 0; }
+
+@media (prefers-reduced-motion: reduce) { .bar i { transition: none; } }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <h1>LinkedIn URL Checker</h1>
+  <div class="cookie-state">
+    <span class="dot" id="cookieDot" aria-hidden="true"></span>
+    <span id="cookieLabel">Cookie: not set</span>
+    <button type="button" class="on-dark" id="cookieBtn">Set cookie</button>
+    <button type="button" class="on-dark" id="forgetBtn">Forget saved data</button>
+  </div>
+</header>
+
+<main class="layout">
+  <section class="panel inputs" aria-label="Input">
+    <div>
+      <label for="urls">URLs, one per line</label>
+      <textarea id="urls" spellcheck="false" placeholder="linkedin.com/in/example&#10;https://www.linkedin.com/in/another/"></textarea>
+      <div class="meta-row">
+        <button type="button" class="secondary" id="loadBtn">Load .txt file</button>
+        <span class="muted" id="urlCount">0 URLs</span>
+      </div>
+      <input type="file" id="fileInput" accept=".txt,text/plain" hidden>
+    </div>
+
+    <div class="pair">
+      <div>
+        <label for="delay">Delay (seconds)</label>
+        <input type="number" id="delay" value="1" min="0" step="0.5">
+      </div>
+      <div>
+        <label for="retries">Max retries</label>
+        <input type="number" id="retries" value="2" min="0" max="5" step="1">
+      </div>
+    </div>
+
+    <div class="actions">
+      <button type="button" id="startBtn">Start test</button>
+      <button type="button" class="stop" id="stopBtn" disabled>Stop</button>
+      <button type="button" class="secondary" id="clearBtn">Clear results</button>
+    </div>
+    <p class="hint">Click a status badge in the table to change it by hand (Live, Dead, Error).</p>
+  </section>
+
+  <section class="results" aria-label="Results">
+    <div class="panel ledger">
+      <div class="counts" aria-live="polite">
+        <div class="count"><b id="cTotal">0</b><span>checked</span></div>
+        <div class="count live"><b id="cLive">0</b><span>live</span></div>
+        <div class="count dead"><b id="cDead">0</b><span>dead</span></div>
+        <div class="count err"><b id="cErr">0</b><span>error</span></div>
+      </div>
+      <div class="bar" role="img" aria-label="Result distribution" id="bar">
+        <i class="s-live" id="bLive" style="width:0%"></i><i class="s-dead" id="bDead" style="width:0%"></i><i class="s-err" id="bErr" style="width:0%"></i>
+      </div>
+      <div class="progress-text muted" id="progressText">Ready.</div>
+    </div>
+
+    <div class="tools">
+      <label class="muted" for="filter" style="margin:0">Show</label>
+      <select id="filter">
+        <option value="All">All</option>
+        <option value="LIVE">Live</option>
+        <option value="DEAD">Dead</option>
+        <option value="ERROR">Error</option>
+      </select>
+      <input type="search" id="search" class="grow" placeholder="Search URLs" aria-label="Search URLs">
+      <button type="button" class="secondary" id="csvBtn">Export CSV</button>
+      <button type="button" id="scriptBtn">Generate Apps Script</button>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr id="headRow">
+            <th data-col="original_url" scope="col">Original URL</th>
+            <th data-col="final_url" scope="col">Final URL</th>
+            <th data-col="status" scope="col">Status</th>
+            <th data-col="note" scope="col">Note</th>
+            <th data-col="checked_at" scope="col">Checked</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+      <div class="empty" id="empty">No results yet. Paste URLs and press Start test.</div>
+    </div>
+  </section>
+</main>
+
+<!-- password -->
+<dialog id="pwDlg">
+  <form id="pwForm">
+    <h2>Enter access password</h2>
+    <p class="hint">This is the APP_PASSWORD you set in Vercel.</p>
+    <div>
+      <label for="pwInput">Password</label>
+      <input type="password" id="pwInput" autocomplete="current-password" required>
+    </div>
+    <div class="msg bad" id="pwMsg" role="alert"></div>
+    <div class="dlg-actions"><button type="submit">Unlock</button></div>
+  </form>
+</dialog>
+
+<!-- cookie -->
+<dialog id="cookieDlg">
+  <form method="dialog" id="cookieForm">
+    <h2>Set LinkedIn cookie</h2>
+    <p class="hint">Copied from a logged-in browser. It is saved in this browser so you do not have to paste it again, and it is sent to your own server with each check. Never share it. Use “Forget saved data” to remove it.</p>
+    <div>
+      <label for="liAt">Option 1: li_at value only</label>
+      <input type="text" id="liAt" autocomplete="off" spellcheck="false">
+    </div>
+    <div>
+      <label for="rawCookie">Option 2: name=value; name2=value2</label>
+      <input type="text" id="rawCookie" autocomplete="off" spellcheck="false">
+    </div>
+    <div>
+      <label for="jsonCookie">Option 3 (best): Cookie-Editor JSON export, all cookies including JSESSIONID</label>
+      <textarea id="jsonCookie" spellcheck="false"></textarea>
+    </div>
+    <div class="msg" id="cookieMsg" role="status"></div>
+    <div class="dlg-actions">
+      <button type="button" class="secondary" id="testCookieBtn">Test cookie</button>
+      <button type="button" id="saveCookieBtn">Save cookie</button>
+      <button type="button" class="secondary" id="cancelCookieBtn">Cancel</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- apps script -->
+<dialog id="scriptDlg">
+  <div class="box">
+    <h2 id="scriptTitle">Generated Apps Script</h2>
+    <textarea id="scriptOut" class="tall" readonly spellcheck="false" wrap="off"></textarea>
+    <div class="msg ok" id="scriptMsg" role="status"></div>
+    <div class="dlg-actions">
+      <button type="button" id="copyScriptBtn">Copy</button>
+      <button type="button" id="saveScriptBtn">Save as .js</button>
+      <button type="button" class="secondary" id="closeScriptBtn">Close</button>
+    </div>
+  </div>
+</dialog>
+
+<script src="lib.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
